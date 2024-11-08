@@ -1,0 +1,103 @@
+<odoo>
+    <data>
+        <record id="server_view_form_load_data_base" model="ir.ui.view">
+            <field name="name">server.form.load_data_base</field>
+            <field name="model">server</field>
+            <field name="arch" type="xml">
+                <form>
+                </form>
+            </field>
+        </record>
+
+        <record id="server_view_form" model="ir.ui.view">
+            <field name="name">server.form</field>
+            <field name="model">server</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet
+                        style="max-width: 800px;height: 800px; margin-left: auto; margin-right: auto;">
+                        <field name="image_1920" widget="image"
+                            class="oe_avatar" options="{'size': [120, 120]}"></field>
+
+                        <div class="oe_title mb24">
+                            <group>
+                                <field name="name" />
+                                <field name="domain" readonly="database != False" />
+                                <field name="database" invisible="not database" readonly="1" />
+                                <field name="username" invisible="not database" readonly="1" />
+                                <field name="password" invisible="not database" readonly="1"
+                                    password="true" />
+                            </group>
+                            <div style="text-align: center; margin-top: 24px;">
+                                <button name="action_load_databases" type="object"
+                                    string="Load Blog Tag" invisible="database"
+                                    class="btn-primary" />
+                            </div>
+                        </div>
+                        <!-- Đường gạch kéo dài hết khung chứa -->
+                        <separator invisible="not database" string="Server Infomation" colspan="2" />
+                        <!-- Đường gạch kéo dài hết khung chứa -->
+                        <div invisible="not database"
+                            style="border: 2px solid #333; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                            <!-- <div class="o_row" style="display: flex; align-items: flex-start;">
+                                <div class="o_col-12" style="flex: 1;">
+                                    <group>
+                                        <label for="server_tag_ids" string="Server Tags" />
+                                        <div class="d-flex align-items-center">
+                                            <field name="server_tag_ids" widget="many2many_tags"
+                                                readonly="1" />
+                                            <button name="action_sync_local_tag"
+                                                string="Update Tags"
+                                                type="object"
+                                                class="oe_highlight"
+                                            />
+                                        </div>
+                                    </group>
+                                </div>
+                            </div> -->
+                            <group>
+
+                                <field name="server_tag_ids" widget="many2many_tags"
+                                    readonly="1" />
+                            </group>
+                            <separator string="Tag Mappings" colspan="2" />
+
+                            <group>
+                                <field name="tag_mapping_ids" string="" readonly="0">
+                                    <tree editable="bottom" create="false">
+
+                                        <field name="local_tag_id" />
+                                        <!-- <field name="server_id" column_invisible="1" /> -->
+                                        <field name="server_tag_ids"
+                                            domain="[('server_id','=',parent.id)]"
+                                            widget="many2many_tags" />
+                                    </tree>
+                                    <form>
+                                        <group>
+                                            <field name="local_tag_id" />
+                                            <field name="server_tag_ids"
+                                                widget="many2many_tags" />
+                                        </group>
+                                    </form>
+                                </field>
+                            </group>
+                            <!-- Đường gạch kéo dài hết khung chứa -->
+                        </div>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+        <record id="server_tree_view" model="ir.ui.view">
+            <field name="name">server.tree</field>
+            <field name="model">server</field>
+            <field name="arch" type="xml">
+                <tree string="Server">
+                    <field name="name" />
+                    <field name="domain" />
+                    <field name="create_date" />
+                    <field name="write_date" />
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>

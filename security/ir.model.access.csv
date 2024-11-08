@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+
+access_server,Server,model_server,base.group_user,1,1,1,1
+access_server_tag,Server Tag,model_server_tag,base.group_user,1,1,1,1
+access_tag_mapping,tag mapping Tag,model_tag_mapping,base.group_user,1,1,1,1
+
+access_blog_transfer,Blog Transfer,model_blog_transfer,base.group_user,1,1,1,1

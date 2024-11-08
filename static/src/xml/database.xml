@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="blogV2.database" owl="1">
+        <div class="o_form_view o_view_controller o_action" > 
+            <div class="o_form_view_container" >
+                <div class="o_content">
+                    <div class="o_form_renderer o_form_editable o_form_saved">
+                        <div class="o_form_sheet_bg">
+                            <div class="o_form_sheet position-relative">
+                                <!-- Hidden iframe for form submission -->
+                                <iframe name="hidden_frame" id="hidden_frame" class="d-none"></iframe>
+                                <form 
+                                    t-att-action="'/api/sync/tag'" 
+                                    method="POST"
+                                    target="hidden_frame"
+                                    class="oe_title mb24">
+                                    <!-- Hidden fields for additional data -->
+                                    <input type="hidden" name="domain" t-att-value="props.action.params.doamin"/>
+                                    <input type="hidden" name="server_id" t-att-value="props.action.params.server_id"/>
+                                    
+                                    <div class="o_inner_group grid">
+                                        <!-- Database Selection -->
+                                        <div class="o_wrap_field d-flex d-sm-contents flex-column mb-3 mb-sm-0">
+                                            <div class="o_cell o_wrap_label flex-grow-1 flex-sm-grow-0 w-100 text-break text-900">
+                                                <label class="o_form_label" for="database">Database</label>
+                                            </div>
+                                            <div class="o_cell o_wrap_input flex-grow-1 flex-sm-grow-0 text-break" style="width: 100%;">
+                                                <select 
+                                                    name="database"
+                                                    id="database" 
+                                                    class="o_input" 
+                                                    required="required">
+                                                    <option value="">Select Database</option>
+                                                    <t t-foreach="state.databases" t-as="db" t-key="db">
+                                                        <option t-att-value="db">
+                                                            <t t-esc="db"/>
+                                                        </option>
+                                                    </t>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Username Field -->
+                                        <div class="o_wrap_field d-flex d-sm-contents flex-column mb-3 mb-sm-0">
+                                            <div class="o_cell o_wrap_label flex-grow-1 flex-sm-grow-0 w-100 text-break text-900">
+                                                <label class="o_form_label" for="username">Username</label>
+                                            </div>
+                                            <div class="o_cell o_wrap_input flex-grow-1 flex-sm-grow-0 text-break" style="width: 100%;">
+                                                <div class="o_field_widget o_required_modifier o_field_char">
+                                                    <input 
+                                                        class="o_input" 
+                                                        id="username" 
+                                                        name="username"
+                                                        type="text" 
+                                                        placeholder="Enter username for domain with selected database"
+                                                        required="required"
+                                                        autocomplete="off"/>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Password Field -->
+                                        <div class="o_wrap_field d-flex d-sm-contents flex-column mb-3 mb-sm-0">
+                                            <div class="o_cell o_wrap_label flex-grow-1 flex-sm-grow-0 w-100 text-break text-900">
+                                                <label class="o_form_label" for="password">Password</label>
+                                            </div>
+                                            <div class="o_cell o_wrap_input flex-grow-1 flex-sm-grow-0 text-break" style="width: 100%;">
+                                                <div class="o_field_widget o_required_modifier o_field_char">
+                                                    <input 
+                                                        class="o_input" 
+                                                        id="password" 
+                                                        name="password"
+                                                        type="password" 
+                                                        placeholder="Enter password for domain with selected database"
+                                                        required="required"
+                                                        autocomplete="new-password"/>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Submit Button -->
+                                        <div class="o_wrap_field d-flex d-sm-contents flex-column mb-3 mb-sm-0">
+                                            <div class="o_cell o_wrap_input flex-grow-1 flex-sm-grow-0 text-break text-center mt-3">
+                                                <button 
+                                                    type="submit"
+                                                    class="btn btn-primary">
+                                                    Connect
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
