@@ -42,7 +42,7 @@
                                 <field name="interval_type" />
                             </div>
                             <field name="numbercall" />
-                            <field name="doall" />
+                            <!-- <field name="doall" /> -->
                         </group>
                     </group>
                     <notebook>

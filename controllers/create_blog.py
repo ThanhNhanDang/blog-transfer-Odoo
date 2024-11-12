@@ -16,11 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class BlogController(http.Controller):
-    
-    def __init__(self):
-        super().__init__()
-        self.dbname = request.db
-    
+
     """
     Controller xử lý các thao tác liên quan đến blog trong Odoo.
     Bao gồm các chức năng tạo/cập nhật bài viết và xử lý hình ảnh.
@@ -88,7 +84,6 @@ class BlogController(http.Controller):
                 headers,
                 {"fields": ["id", "checksum"]}
             )
-            _logger.info(attachment)
 
             if attachment.get("result"):
                 return attachment["result"][0]
@@ -162,7 +157,7 @@ class BlogController(http.Controller):
             _logger.error(f"Error uploading image: {str(e)}")
             return None
 
-    def _process_images_in_content(self, content, domain, headers):
+    def _process_images_in_content(self, content, domain, headers, db_name_local):
         """
         Xử lý tất cả hình ảnh trong nội dung, giữ nguyên các thuộc tính.
 
@@ -177,7 +172,7 @@ class BlogController(http.Controller):
         if not content:
             return content
 
-        def replace_image(match):
+        def replace_image(match, db_name_local):
             """
             Hàm callback thay thế URL hình ảnh.
             Xử lý cả hình ảnh trong CSS và thẻ img.
@@ -188,7 +183,7 @@ class BlogController(http.Controller):
                     image_url = match.group(1)
                     if domain in image_url or "/website/static/src" in image_url or "/web/image/website" in image_url:
                         return match.group(0)
-                    return f"url('{replace_image_url(image_url)}')"
+                    return f"url('{replace_image_url(image_url, db_name_local)}')"
 
                 # Xử lý thẻ img
                 full_tag = match.group(0)
@@ -197,7 +192,7 @@ class BlogController(http.Controller):
                 if domain in src_url or "/website/static/src" in src_url or "/web/image/website" in src_url:
                     return full_tag
 
-                new_url = replace_image_url(src_url)
+                new_url = replace_image_url(src_url, db_name_local)
                 if not new_url:
                     return full_tag
 
@@ -217,15 +212,15 @@ class BlogController(http.Controller):
                 _logger.error(f"Error processing image: {str(e)}")
                 return match.group(0)
 
-        def replace_image_url(image_url):
+        def replace_image_url(image_url, db_name_local):
             """
             Thay thế URL hình ảnh bằng cách tải và upload lại lên server.
             """
             try:
-                registry = api.Registry(self.dbname)
+                registry = api.Registry(db_name_local)
                 with registry.cursor() as cr:
                     env = api.Environment(cr, SUPERUSER_ID, {})
-                    
+
                     attachment = env['ir.attachment'].search(
                         [('image_src', '=', image_url)], limit=1)
                     if not attachment:
@@ -246,11 +241,12 @@ class BlogController(http.Controller):
                 return None
 
         # Xử lý ảnh trong CSS
-        content = re.sub(r"url\('([^']+)'\)", replace_image, content)
+        content = re.sub(
+            r"url\('([^']+)'\)", lambda m: replace_image(m, db_name_local), content)
 
         # Xử lý thẻ img
         content = re.sub(
-            r'<img\s+[^>]*src="([^"]+)"[^>]*>', replace_image, content)
+            r'<img\s+[^>]*src="([^"]+)"[^>]*>', lambda m: replace_image(m, db_name_local), content)
 
         return content
 
@@ -340,7 +336,7 @@ class BlogController(http.Controller):
         """
         try:
             required_fields = ['blog_folder', 'title', 'content',
-                               'server_tag_ids', 'domain', 'database', 'username', 'password']
+                               'server_tag_ids', 'domain', 'database', 'username', 'password','db_name_local']
             for field in required_fields:
                 if field not in kw:
                     return {
@@ -369,7 +365,7 @@ class BlogController(http.Controller):
             }
             # Process and upload only modified images
             processed_content = self._process_images_in_content(
-                cleaned_content, kw['domain'], headers)
+                cleaned_content, kw['domain'], headers, kw['db_name_local'])
             _logger.info(processed_content)
 
             # Create/find blog folder

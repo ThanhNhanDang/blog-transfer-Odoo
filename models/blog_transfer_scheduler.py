@@ -73,7 +73,6 @@ class BlogTransferScheduler(models.Model):
         ('done', 'Hoàn thành'),
         ('cancelled', 'Đã hủy')
     ], string='Trạng thái', default='draft')
-  
 
     def _compute_nextcall(self):
         for record in self:
@@ -109,7 +108,9 @@ class BlogTransferScheduler(models.Model):
             _logger.info(scheduler)
             try:
                 # Đánh dấu các chiến dịch đang được xử lý
-                transfer_jobs = scheduler.blog_transfer_ids
+                transfer_jobs = scheduler.blog_transfer_ids.filtered(
+                    lambda x: x.state in ['draft', 'failed']
+                )
                 if transfer_jobs:
                     _logger.info(
                         f"Starting scheduled transfer for {scheduler.name}")

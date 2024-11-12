@@ -27,6 +27,7 @@
                                 readonly="1" />
                             <field name="available_server_tags"
                                 widget="many2many_tags"
+                                domain="[('server_id', '=', server_mapping_id)]"
                                 readonly="0"
                             />
                         </group>

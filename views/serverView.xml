@@ -42,7 +42,7 @@
                             <group>
 
                                 <field name="server_tag_ids" widget="many2many_tags"
-                                    readonly="1" />
+                                    readonly="1" domain="[('server_id', '=', id)]" />
                             </group>
                             <separator string="Tag Mappings" colspan="2" />
 
@@ -61,7 +61,7 @@
                                         <group>
                                             <field name="local_tag_id" />
                                             <field name="server_tag_ids"
-                                                widget="many2many_tags"  />
+                                                widget="many2many_tags" />
                                         </group>
                                     </form>
                                 </field>

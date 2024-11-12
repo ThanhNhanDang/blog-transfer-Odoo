@@ -116,7 +116,8 @@ class BlogTransfer(models.Model):
                 'database': server.database,
                 'username': server.username,
                 'password': server.password,
-                'blog_transfer_id': self.id
+                'blog_transfer_id': self.id,
+                'db_name_local': self.env.cr.dbname
             }
 
             # Gọi method create_blog
@@ -141,13 +142,13 @@ class BlogTransfer(models.Model):
         log_message = f"[{timestamp}] Post '{post.name}' to server '{server.name}': "
         log_message += "SUCCESS" if success else "FAILED"
         log_message += f" - {message}"
-
+        error_log = ""
         if not success:
             if self.error_log:
-                self.error_log += "\n" + log_message
+                error_log = self.error_log + "\n" + log_message
             else:
-                self.error_log = log_message
-            _logger.error(log_message)
+                error_log = log_message
+            self.write({'error_log': error_log})
 
     def action_start_transfer(self):
         self.ensure_one()
@@ -216,10 +217,12 @@ class BlogTransfer(models.Model):
             - End time: {self.end_time}
             - Final status: {end_status}
             """
+            error_log = ""
             if self.error_log:
-                self.error_log += "\n\n" + summary
+                error_log = self.error_log + "\n\n" + summary
             else:
-                self.error_log = summary
+                error_log = summary
+            self.write({"error_log": error_log})
 
 
 class IrAttachment(models.Model):
