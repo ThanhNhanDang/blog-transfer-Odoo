@@ -27,8 +27,8 @@
                                 readonly="1" />
                             <field name="available_server_tags"
                                 widget="many2many_tags"
-                                readonly="1"
-                              />
+                                readonly="0"
+                            />
                         </group>
                         <group>
                             <field name="start_time" readonly="1" />
@@ -39,13 +39,46 @@
                         </group>
                     </group>
 
+
+                    <!-- Đường gạch kéo dài hết khung chứa -->
+
+
+                    <field name="is_error" readonly="0" invisible="1" />
                     <notebook>
-                        <field name="is_error" readonly="0" invisible="1" />
-                        <notebook>
-                            <page string="Log Lỗi" invisible="not is_error">
-                                <field name="error_log" readonly="1" />
-                            </page>
-                        </notebook>
+                        <page string="Server Infomation" invisible="not server_mapping_id">
+                            <div
+                                style="border: 2px solid #333; padding: 25px; border-radius: 8px; margin-top: 16px;">
+                                <group>
+                                    <field name="server_tag_ids" widget="many2many_tags"
+                                        readonly="1" />
+                                </group>
+                                <separator string="Tag Mappings" colspan="2" />
+
+                                <group>
+                                    <field name="tag_mapping_ids" string="" readonly="1">
+                                        <tree editable="bottom" create="false">
+
+                                            <field name="local_tag_id" />
+                                            <!-- <field name="server_id" column_invisible="1" /> -->
+                                            <field name="server_tag_ids"
+                                                widget="many2many_tags" />
+                                        </tree>
+                                        <form>
+                                            <group>
+                                                <field name="local_tag_id" />
+                                                <field name="server_tag_ids"
+                                                    widget="many2many_tags" />
+                                            </group>
+                                        </form>
+                                    </field>
+                                </group>
+                                <!-- Đường gạch kéo dài hết khung chứa -->
+                            </div>
+                        </page>
+                        <page string="Log Lỗi" invisible="not is_error">
+                            <field name="error_log" readonly="1" />
+                        </page>
+
                     </notebook>
                 </sheet>
             </form>
@@ -62,6 +95,7 @@
                 <field name="selected_post_id" />
                 <field name="server_mapping_id" />
                 <field name="state" />
+                <field name="blog_post_write_date" />
                 <field name="write_date" />
             </tree>
         </field>

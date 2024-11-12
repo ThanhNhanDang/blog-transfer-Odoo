@@ -1,3 +1,4 @@
+import xmlrpc.client
 import pytz
 from datetime import datetime
 import logging
@@ -9,8 +10,10 @@ from odoo.exceptions import UserError  # Nhập ngoại lệ UserError để x�
 import requests  # Nhập thư viện requests để thực hiện các yêu cầu HTTP
 import logging  # Nhập thư viện logging để ghi lại thông tin và lỗi
 from odoo.http import request
+from odoo.addons.blogV2.controllers.create_blog import BlogController
 import json
 _logger = logging.getLogger(__name__)  # Tạo logger để ghi lại thông tin
+
 
 class BlogTransfer(models.Model):
     _name = 'blog.transfer'
@@ -29,7 +32,6 @@ class BlogTransfer(models.Model):
     available_server_tags = fields.Many2many(
         'server.tag',
         string='Tag server được chọn',
-        compute='_compute_available_server_tags',
     )
 
     state = fields.Selection([
@@ -41,81 +43,93 @@ class BlogTransfer(models.Model):
 
     start_time = fields.Datetime(string='Thời gian bắt đầu')
     end_time = fields.Datetime(string='Thời gian kết thúc')
+
+    blog_post_write_date = fields.Datetime(
+        string='Blog Post Last Update On',  related='selected_post_id.write_date')
+    server_tag_ids = fields.One2many(
+        "server.tag", "server_id", string="Server Tags", related='server_mapping_id.server_tag_ids'
+    )
+    tag_mapping_ids = fields.One2many(
+        'tag.mapping', 'server_id', string='Tag Mappings', related='server_mapping_id.tag_mapping_ids'
+    )
+
     error_log = fields.Text(string='Log lỗi')
 
     is_error = fields.Boolean(string='Is error')
 
-    @api.depends('selected_post_id', 'server_mapping_id')
-    def _compute_available_server_tags(self):
-        for record in self:
-            if record.blog_tag_ids and record.server_mapping_id:
-                server_tags = self.env['server.tag'].search([
-                    ('local_tag_ids', 'in', record.blog_tag_ids.ids),
-                    ('server_id', 'in', record.server_mapping_id.ids)
-                ])
+    # Biến class để lưu instance của controller
+    _blog_controller = None
 
-                record.available_server_tags = [(6, 0, server_tags.ids)]
-            else:
-                record.available_server_tags = [(6, 0, [])]
+    @classmethod
+    def get_blog_controller(self):
+        """
+        Singleton pattern để lấy hoặc tạo instance của BlogController
+        """
+        if not self._blog_controller:
+            self._blog_controller = BlogController()
+        return self._blog_controller
+
+    def create(self, vals):
+        new_record = super(BlogTransfer, self).create(vals)
+        scheduler = self.env['blog.transfer.scheduler'].search([], limit=1)
+        if not scheduler:
+            scheduler = self.env['blog.transfer.scheduler'].create({
+                'name': 'Scheduler',
+                'user_id': self.env.user.id,
+                'interval_number': 1,
+                'interval_type': 'minutes',
+                'numbercall': -1,
+                'state': 'draft',
+                'doall': False,
+                'active': True
+            })
+        scheduler.blog_transfer_ids = [(4, new_record.id)]
+        return new_record
+
+    @api.onchange('selected_post_id', 'server_mapping_id')
+    def _onchange_available_server_tags(self):
+        if self.blog_tag_ids and self.server_mapping_id:
+            server_tags = self.env['server.tag'].search([
+                ('local_tag_ids', 'in', self.blog_tag_ids.ids),
+                ('server_id', 'in', self.server_mapping_id.ids)
+            ])
+
+            self.available_server_tags = [(6, 0, server_tags.ids)]
+        else:
+            self.available_server_tags = [(6, 0, [])]
 
     def _call_create_blog_api(self, server, post, server_tag_ids):
         """
-        Gọi API để tạo blog trên server đích
+        Gọi trực tiếp method create_blog từ BlogController
         Returns: (success, message)
         """
         try:
-            # Chuẩn bị dữ liệu để gửi
-            data = {
-                'jsonrpc': '2.0',
-                'method': 'call',
-                'params': {
-                    'blog_folder': post.blog_id.name,
-                    'title': post.name,
-                    'content': post.content,
-                    'server_tag_ids': server_tag_ids,
-                    'domain': server.domain,
-                    'database': server.database,
-                    'username': server.username,
-                    'password': server.password,
-                    'blog_transfer_id': self.id
-                },
-                'id': None
-            }
-            # Lấy session của người dùng hiện tại
-            session_cookie = request.httprequest.cookies.get('session_id')
-
-            # Chuẩn bị headers với session
-            headers = {
-                'Content-Type': 'application/json',
-                'Cookie': f'session_id={session_cookie}',
-                'X-Openerp-Session-Id': request.session.sid,
-                'X-CSRF-Token': request.csrf_token()
+            # Lấy controller instance từ singleton
+            blog_controller = self.get_blog_controller()
+           # Chuẩn bị params
+            params = {
+                'blog_folder': post.blog_id.name,
+                'title': post.name,
+                'content': post.content,
+                'server_tag_ids': server_tag_ids,
+                'domain': server.domain,
+                'database': server.database,
+                'username': server.username,
+                'password': server.password,
+                'blog_transfer_id': self.id
             }
 
-            # Gọi API
-            response = requests.post(url=f"{self.env['ir.config_parameter'].sudo().get_param('web.base.url')}/api/create/blog", json=data, timeout=30,  headers=headers,
-                                     cookies=request.httprequest.cookies)
-            response_data = response.json()
+            # Gọi method create_blog
+            result = blog_controller.create_blog(**params)
 
             # Kiểm tra kết quả
-            if response.status_code == 200:
-                if response_data.get('result', {}).get('status') == "success":
-                    return True, response_data.get('result', {}).get('message')
-                else:
-                    error_message = response_data.get('result', {}).get(
-                        'message') or 'Unknown error occurred'
-                    return False, f"API Error: {error_message}"
+            if result.get('status') == "success":
+                return True, result.get('message')
             else:
-                error_message = response_data.get('result', {}).get(
+                error_message = result.get(
                     'message') or 'Unknown error occurred'
-                return False, f"API Error: {error_message}"
+                return False, f"Error: {error_message}"
 
-        except requests.exceptions.Timeout:
-            return False, "API timeout error"
-        except requests.exceptions.ConnectionError:
-            return False, "Could not connect to server"
-        except json.JSONDecodeError:
-            return False, "Invalid JSON response from server"
         except Exception as e:
             return False, f"Unexpected error: {str(e)}"
 
@@ -157,7 +171,8 @@ class BlogTransfer(models.Model):
             post = self.selected_post_id
             try:
                 # Chuẩn bị dữ liệu tags
-                server_tag_ids = self.available_server_tags.mapped('tag_server_id')
+                server_tag_ids = self.available_server_tags.mapped(
+                    'tag_server_id')
 
                 # Gọi API và xử lý kết quả
                 success, message = self._call_create_blog_api(
@@ -205,3 +220,8 @@ class BlogTransfer(models.Model):
                 self.error_log += "\n\n" + summary
             else:
                 self.error_log = summary
+
+
+class IrAttachment(models.Model):
+    _inherit = 'ir.attachment'
+    image_src = fields.Char(store=True)

@@ -1,4 +1,5 @@
-from odoo import http
+from odoo import http, _,  api, SUPERUSER_ID
+
 from odoo.http import request, Response
 import json
 import html
@@ -15,7 +16,29 @@ _logger = logging.getLogger(__name__)
 
 
 class BlogController(http.Controller):
+    
+    def __init__(self):
+        super().__init__()
+        self.dbname = request.db
+    
+    """
+    Controller xử lý các thao tác liên quan đến blog trong Odoo.
+    Bao gồm các chức năng tạo/cập nhật bài viết và xử lý hình ảnh.
+    """
+
     def action_login(self, domain, database, username, password):
+        """
+        Thực hiện đăng nhập vào hệ thống Odoo thông qua API.
+
+        Args:
+            domain: Domain của server Odoo
+            database: Tên database
+            username: Tên đăng nhập
+            password: Mật khẩu
+
+        Returns:
+            session_data: Dữ liệu phiên đăng nhập
+        """
         url = f"{domain}/web/session/authenticate"
         data = {
             "jsonrpc": "2.0",
@@ -32,13 +55,31 @@ class BlogController(http.Controller):
         return session_data
 
     def _get_image_hash(self, image_data):
-        """Calculate hash of image data to check for changes"""
+        """
+        Tính toán giá trị hash của dữ liệu hình ảnh để kiểm tra thay đổi.
+
+        Args:
+            image_data: Dữ liệu nhị phân của hình ảnh
+
+        Returns:
+            str: Giá trị hash MD5 của hình ảnh
+        """
         return hashlib.md5(image_data).hexdigest()
 
     def _get_existing_attachment(self, original_url, domain, headers):
-        """Get existing attachment info based on original URL"""
+        """
+        Lấy thông tin attachment đã tồn tại dựa trên URL gốc.
+
+        Args:
+            original_url: URL gốc của hình ảnh
+            domain: Domain của server Odoo
+            headers: Headers cho request API
+
+        Returns:
+            dict: Thông tin attachment nếu tồn tại, None nếu không
+        """
         try:
-            # Tìm attachment dựa trên URL gốc được lưu trong field description
+            # Tìm attachment dựa trên URL gốc trong field description
             attachment = self.call_external_api(
                 "ir.attachment",
                 "search_read",
@@ -51,38 +92,50 @@ class BlogController(http.Controller):
 
             if attachment.get("result"):
                 return attachment["result"][0]
-
             return None
         except Exception as e:
             _logger.error(f"Error getting existing attachment: {str(e)}")
             return None
 
     def _upload_image_to_server(self, image_data, filename, original_url, domain, headers):
-        """Upload an image to Odoo server with original URL reference"""
+        """
+        Upload hình ảnh lên server Odoo và lưu trữ tham chiếu URL gốc.
+
+        Args:
+            image_data: Dữ liệu nhị phân của hình ảnh
+            filename: Tên file
+            original_url: URL gốc của hình ảnh
+            domain: Domain của server Odoo
+            headers: Headers cho request API
+
+        Returns:
+            str: URL của hình ảnh đã upload
+        """
         try:
-            # Kiểm tra xem ảnh đã tồn tại chưa
+            # Kiểm tra attachment tồn tại
             existing_attachment = self._get_existing_attachment(
                 original_url, domain, headers)
             _logger.info(existing_attachment)
-            # Tính toán hash của ảnh mới
+
+            # Tính hash mới
             new_image_hash = self._get_image_hash(image_data)
 
-            # Nếu ảnh đã tồn tại và không thay đổi, trả về URL cũ
+            # Kiểm tra nếu ảnh không thay đổi
             if existing_attachment and existing_attachment.get("checksum") == new_image_hash:
                 return f"{domain}/web/image/{existing_attachment['id']}"
 
-            # Tạo attachment mới hoặc cập nhật attachment cũ
+            # Chuẩn bị dữ liệu attachment
             attachment_data = {
                 'name': filename,
                 'type': 'binary',
                 'datas': base64.b64encode(image_data).decode('utf-8'),
                 'public': True,
                 'res_model': 'ir.ui.view',
-                'description': original_url  # Lưu URL gốc để tham chiếu sau này
+                'description': original_url
             }
 
             if existing_attachment:
-                # Cập nhật attachment hiện có
+                # Cập nhật attachment cũ
                 attachment_response = self.call_external_api(
                     "ir.attachment",
                     "write",
@@ -110,20 +163,34 @@ class BlogController(http.Controller):
             return None
 
     def _process_images_in_content(self, content, domain, headers):
-        """Process images in the content and preserve all attributes"""
+        """
+        Xử lý tất cả hình ảnh trong nội dung, giữ nguyên các thuộc tính.
+
+        Args:
+            content: Nội dung HTML cần xử lý
+            domain: Domain của server Odoo  
+            headers: Headers cho request API
+
+        Returns:
+            str: Nội dung đã xử lý với các URL hình ảnh mới
+        """
         if not content:
             return content
 
         def replace_image(match):
+            """
+            Hàm callback thay thế URL hình ảnh.
+            Xử lý cả hình ảnh trong CSS và thẻ img.
+            """
             try:
-                # For CSS background images
+                # Xử lý ảnh trong CSS background
                 if "url('" in match.group(0):
                     image_url = match.group(1)
                     if domain in image_url or "/website/static/src" in image_url or "/web/image/website" in image_url:
                         return match.group(0)
                     return f"url('{replace_image_url(image_url)}')"
 
-                # For img tags
+                # Xử lý thẻ img
                 full_tag = match.group(0)
                 src_url = match.group(1)
 
@@ -134,14 +201,13 @@ class BlogController(http.Controller):
                 if not new_url:
                     return full_tag
 
-                # Replace both src and data-original-src while preserving all other attributes
+                # Cập nhật cả src và data-original-src
                 updated_tag = re.sub(
                     r'src="[^"]*"', f'src="{new_url}"', full_tag)
                 if 'data-original-src="' in updated_tag:
                     updated_tag = re.sub(
                         r'data-original-src="[^"]*"', f'data-original-src="{new_url}"', updated_tag)
                 else:
-                    # Insert data-original-src right after src
                     updated_tag = updated_tag.replace(
                         f'src="{new_url}"', f'src="{new_url}" data-original-src="{new_url}"')
 
@@ -152,73 +218,91 @@ class BlogController(http.Controller):
                 return match.group(0)
 
         def replace_image_url(image_url):
+            """
+            Thay thế URL hình ảnh bằng cách tải và upload lại lên server.
+            """
             try:
-                session_cookie_local = request.httprequest.cookies.get(
-                    'session_id')
-                headers_local = {
-                    'Content-Type': 'application/json',
-                    'Cookie': f'session_id={session_cookie_local}',
-                    'X-Openerp-Session-Id': request.session.sid,
-                    'X-CSRF-Token': request.csrf_token()
-                }
-
-                image_url_local = f"{request.env['ir.config_parameter'].sudo().get_param('web.base.url')}{image_url}"
-                image_response = requests.get(
-                    image_url_local, headers=headers_local, cookies=request.httprequest.cookies)
-
-                if image_response.status_code != 200:
-                    return None
-
-                filename = os.path.basename(
-                    urlparse(image_url_local).path) or 'image.jpg'
-                new_url = self._upload_image_to_server(
-                    image_response.content,
-                    filename,
-                    image_url,
-                    domain,
-                    headers
-                )
-                return new_url
+                registry = api.Registry(self.dbname)
+                with registry.cursor() as cr:
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    
+                    attachment = env['ir.attachment'].search(
+                        [('image_src', '=', image_url)], limit=1)
+                    if not attachment:
+                        return None
+                    image_data = base64.b64decode(attachment.datas)
+                    filename = attachment.name
+                    new_url = self._upload_image_to_server(
+                        image_data,
+                        filename,
+                        image_url,
+                        domain,
+                        headers
+                    )
+                    return new_url
             except Exception as e:
                 _logger.error(
                     f"Error processing image URL {image_url}: {str(e)}")
                 return None
 
-        # Process CSS background images
+        # Xử lý ảnh trong CSS
         content = re.sub(r"url\('([^']+)'\)", replace_image, content)
 
-        # Process img tags - now matching the complete img tag to preserve attributes
+        # Xử lý thẻ img
         content = re.sub(
             r'<img\s+[^>]*src="([^"]+)"[^>]*>', replace_image, content)
 
         return content
 
     def _clean_content(self, content):
-        """Clean and format blog content"""
+        """
+        Làm sạch và định dạng nội dung blog.
+
+        Args:
+            content: Nội dung cần làm sạch
+
+        Returns:
+            str: Nội dung đã được làm sạch
+        """
         if not content:
             return ""
 
-        # Unescape content first
+        # Giải mã HTML entities
         content = html.unescape(content)
 
-        # Replace escaped newlines with actual newlines
+        # Thay thế escaped newlines
         content = content.replace('\\n', '\n')
 
-        # Fix image URLs - replace multiple backslashes with single
+        # Sửa URL hình ảnh
         content = re.sub(r"url\(\\+'([^)]+)\\+'\)", r"url('\1')", content)
 
-        # Normalize newlines
+        # Chuẩn hóa newlines
         content = re.sub(r'\n\s*\n', '\n', content)
 
-        # Remove unnecessary spaces at start/end
+        # Xóa khoảng trắng thừa
         content = content.strip()
 
-        # Additional cleanup for any remaining double escaped quotes
+        # Xử lý escaped quotes
         content = content.replace("\\'", "'")
 
         return content
 
     def call_external_api(self, model, method, args, domain, headers, kwargs={}, id=0):
+        """
+        Gọi API external của Odoo.
+
+        Args:
+            model: Tên model Odoo
+            method: Tên phương thức cần gọi
+            args: Tham số cho phương thức
+            domain: Domain của server
+            headers: Headers cho request
+            kwargs: Các tham số bổ sung
+            id: ID của record (cho phương thức write)
+
+        Returns:
+            dict: Kết quả từ API
+        """
         data = {
             "jsonrpc": "2.0",
             "method": "call",
@@ -231,13 +315,29 @@ class BlogController(http.Controller):
             "id": 2
         }
 
-        blog_folder_response = requests.post(
+        response = requests.post(
             f"{domain}/web/dataset/call_kw", headers=headers, json=data)
-        blog_folder = blog_folder_response.json()
-        return blog_folder
+        return response.json()
 
     @http.route('/api/create/blog', type='json', auth='user', methods=["POST"], csrf=False)
     def create_blog(self, **kw):
+        """
+        API endpoint để tạo hoặc cập nhật bài viết blog.
+
+        Args:
+            kw: Các tham số từ request
+                - blog_folder: Tên thư mục blog
+                - title: Tiêu đề bài viết
+                - content: Nội dung bài viết
+                - server_tag_ids: IDs của các tag
+                - domain: Domain server
+                - database: Tên database
+                - username: Tên đăng nhập
+                - password: Mật khẩu
+
+        Returns:
+            dict: Kết quả tạo/cập nhật blog
+        """
         try:
             required_fields = ['blog_folder', 'title', 'content',
                                'server_tag_ids', 'domain', 'database', 'username', 'password']
@@ -267,7 +367,6 @@ class BlogController(http.Controller):
                 'Content-Type': 'application/json',
                 'Cookie': f'session_id={session_id}'
             }
-            _logger.info(cleaned_content)
             # Process and upload only modified images
             processed_content = self._process_images_in_content(
                 cleaned_content, kw['domain'], headers)

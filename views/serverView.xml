@@ -39,22 +39,6 @@
                         <!-- Đường gạch kéo dài hết khung chứa -->
                         <div invisible="not database"
                             style="border: 2px solid #333; padding: 16px; border-radius: 8px; margin-top: 16px;">
-                            <!-- <div class="o_row" style="display: flex; align-items: flex-start;">
-                                <div class="o_col-12" style="flex: 1;">
-                                    <group>
-                                        <label for="server_tag_ids" string="Server Tags" />
-                                        <div class="d-flex align-items-center">
-                                            <field name="server_tag_ids" widget="many2many_tags"
-                                                readonly="1" />
-                                            <button name="action_sync_local_tag"
-                                                string="Update Tags"
-                                                type="object"
-                                                class="oe_highlight"
-                                            />
-                                        </div>
-                                    </group>
-                                </div>
-                            </div> -->
                             <group>
 
                                 <field name="server_tag_ids" widget="many2many_tags"
@@ -70,13 +54,14 @@
                                         <!-- <field name="server_id" column_invisible="1" /> -->
                                         <field name="server_tag_ids"
                                             domain="[('server_id','=',parent.id)]"
+                                            readonly="0"
                                             widget="many2many_tags" />
                                     </tree>
                                     <form>
                                         <group>
                                             <field name="local_tag_id" />
                                             <field name="server_tag_ids"
-                                                widget="many2many_tags" />
+                                                widget="many2many_tags"  />
                                         </group>
                                     </form>
                                 </field>

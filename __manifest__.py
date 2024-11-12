@@ -10,8 +10,9 @@
     "depends": ["base", "web", "website_blog"],
     "data": [  # Do no change the order
         "security/ir.model.access.csv",
-        "views/serverView.xml",
+        "views/blog_transfer_scheduler.xml",
         "views/blog_transfer.xml",
+        "views/serverView.xml",
         "views/menuItems.xml",
     ],
     "installable": True,

@@ -27,26 +27,20 @@
         <menuitem id="server" name="Server" parent="configuration"
             action="action_server_configuration"
         />
-        
-        <record id="action_server_configuration_tag" model="ir.actions.act_window">
-            <field name="name">Server</field>
-            <field name="res_model">ir.attachment</field>
-            <field name="view_mode">tree,form</field>
-            <field name="target">current</field>
+
+        <record id="action_blog_transfer_scheduler" model="ir.actions.server">
+            <field name="name">Blog Transfer Schedules</field>
+            <field name="model_id" ref="model_blog_transfer_scheduler" />
+            <field name="state">code</field>
+            <field name="code">action = model.action_show()</field>
         </record>
 
-        <record id="action_server_configuration_local_tag" model="ir.actions.act_window">
-            <field name="name">Local</field>
-            <field name="res_model">tag.mapping</field>
-            <field name="view_mode">tree,form</field>
-            <field name="target">current</field>
-        </record>
+        <!-- Menu -->
+        <menuitem id="menu_blog_transfer_scheduler"
+            name="Lịch chuyển blog"
+            parent="configuration"
+            action="action_blog_transfer_scheduler"
+            sequence="20" />
 
-        <menuitem id="server_tag" name="Server Tag" parent="configuration"
-        action="action_server_configuration_tag"
-        />
-        <menuitem id="local_tag" name="Local Tag Mapping" parent="configuration"
-        action="action_server_configuration_local_tag"
-        />
     </data>
 </odoo>

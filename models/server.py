@@ -47,15 +47,6 @@ class Server(models.Model):
                 domain=[('name', '=', vals['name'])], limit=1)
             if server:
                 raise UserError(_("Server Name already existed!"))
-
-        if vals.get('database', False):
-            server = self.env['server'].search(
-                domain=[('domain', '=', self.domain), ('database', '=', vals['database'])], limit=1)
-            if server:
-                raise UserError(_("Database already existed!"))
-            else:
-                new_record = super(Server, self).write(vals)
-                return new_record
         new_record = super(Server, self).write(vals)
         return new_record
 

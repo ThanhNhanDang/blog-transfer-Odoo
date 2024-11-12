@@ -5,3 +5,4 @@ access_server_tag,Server Tag,model_server_tag,base.group_user,1,1,1,1
 access_tag_mapping,tag mapping Tag,model_tag_mapping,base.group_user,1,1,1,1
 
 access_blog_transfer,Blog Transfer,model_blog_transfer,base.group_user,1,1,1,1
+access_blog_transfer_scheduler,Blog Transfer Scheduler,model_blog_transfer_scheduler,base.group_user,1,1,1,1
