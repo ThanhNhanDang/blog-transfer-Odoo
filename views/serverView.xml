@@ -23,6 +23,7 @@
                             <group>
                                 <field name="name" />
                                 <field name="domain" readonly="database != False" />
+                                <field name="session" readonly="0" />
                                 <field name="database" invisible="not database" readonly="1" />
                                 <field name="username" invisible="not database" readonly="1" />
                                 <field name="password" invisible="not database" readonly="1"

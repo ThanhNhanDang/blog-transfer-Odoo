@@ -27,29 +27,58 @@ class DatabaseController(http.Controller):
         }
         # Gửi yêu cầu đăng nhập
         session_data = requests.post(url, json=data)  # Gửi yêu cầu POST
-        session_data.json()  # Lấy dữ liệu phản hồi
 
-        return session_data  # Trả về dữ liệu phiên làm việc
+        auth_response_data = session_data.json()
+        if not (auth_response_data.get("result") and auth_response_data["result"].get("uid")):
+            return False
+
+        session_id = session_data.cookies['session_id']
+        return session_id
+
+    def callAPI(self, domain, headers, data):
+        try:
+            response = requests.post(
+                f"{domain}/web/dataset/call_kw",
+                headers=headers,
+                json=data
+            )
+            # Kiểm tra HTTP status
+            response.raise_for_status()  # Raise exception for 4XX/5XX status
+            result = response.json()
+
+            if result.get('error'):
+                _logger.error(f"Error fetching tags: {result['error']}")
+                return {
+                    'status': 'error',
+                    'message': f"Error fetching tags: {result['error']}"}
+
+            return result
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                return {
+                    'status': '404',
+                    'message': 'API endpoint not found. Please check the domain URL or if the API path has changed.'}
+            return {
+                'status': 'HTTPError',
+                'message': f'HTTP Error: {e.response.status_code}'
+            }
+        except Exception as e:
+            _logger.error(f"Error syncing remote tags: {str(e)}")
+            return {
+                'status': 'Exception',
+                'message': f"Error syncing remote tags: {str(e)}"
+            }
 
     @http.route('/api/compute/sync/tag', type='json', auth='user', methods=["POST"], csrf=False)
     def _sync_remote_tags(self, **kw):
-        # Login vào server từ xa
-        session_data = self.action_login(
-            kw["domain"], kw["database"], kw["username"], kw["password"]
-        )
-        auth_response_data = session_data.json()
-        if not (auth_response_data.get("result") and auth_response_data["result"].get("uid")):
-            _logger.error(
-                f"_sync_remote_tags Authentication failed for server")
+        if not kw['session']:
             return False
-        session_id = session_data.cookies['session_id']
-
         # Lấy tags từ server từ xa
         headers = {
             'Content-Type': 'application/json',
-            'Cookie': f'session_id={session_id}'
+            'Cookie': "session_id="+kw['session']
         }
-
         data = {
             "jsonrpc": "2.0",
             "method": "call",
@@ -65,18 +94,18 @@ class DatabaseController(http.Controller):
         }
 
         try:
-            response = requests.post(
-                f"{kw['domain']}/web/dataset/call_kw",
-                headers=headers,
-                json=data
-            )
-            result = response.json()
-
-            if result.get('error'):
-                _logger.error(f"Error fetching tags: {result['error']}")
-                return False
-
-            return result.get('result', [])
+            response = self.callAPI(kw['domain'], headers, data)
+            if not response.get('result', False):
+                if response['status'] == '404':
+                    session_id = self.action_login(
+                        kw["domain"], kw["database"], kw["username"], kw["password"]
+                    )
+                    headers.update({'Cookie': f'session_id={session_id}'})
+                    response = self.callAPI(kw['domain'], headers, data)
+                    response.update({"session": session_id})
+                else:
+                    return False
+            return response
 
         except Exception as e:
             _logger.error(f"Error syncing remote tags: {str(e)}")
@@ -84,27 +113,27 @@ class DatabaseController(http.Controller):
 
     @http.route('/api/sync/tag', type='http', auth='user', methods=["POST"], csrf=False)
     def sync_tag(self, **kw):
-        
-        # Try cactch để bắt sự kiện nếu tồn tại domain trùng database
         try:
-            request.env['server'].browse(int(kw['server_id'])).write({
-                'database': kw["database"]})
-        except Exception as e:
-            return Response(
-                json.dumps({
-                    "status": "error",
-                    "message": str(e),
-                }),
-                content_type='application/json;charset=utf-8',
-                status=200  # Để iframe có thể đọc response
+            # Login vào server từ xa
+            session_id = self.action_login(
+                kw["domain"], kw["database"], kw["username"], kw["password"]
             )
+            if not session_id:
+                return Response(
+                    json.dumps({
+                        "status": "error",
+                        "message": "Sai Username hoặc Password",
+                    }),
+                    content_type='application/json;charset=utf-8',
+                    status=400
+                )
 
-        try:
             request.env['server'].browse(int(kw['server_id'])).write({
                 'username': kw["username"],
+                'session': session_id,
+                'database': kw["database"],
                 'password': kw["password"],
             })
-
             return Response(
                 json.dumps({
                     "status": "success",

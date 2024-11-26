@@ -29,8 +29,13 @@ class Server(models.Model):
     server_tag_ids = fields.One2many(
         "server.tag", "server_id", string="Server Tags", compute="_compute_sync_tag"
     )
+
     tag_mapping_ids = fields.One2many(
         'tag.mapping', 'server_id', string='Tag Mappings', compute="_compute_sync_local_tag"
+    )
+
+    session = fields.Char(
+        'Session'
     )
 
     def create(self, vals):
@@ -68,18 +73,27 @@ class Server(models.Model):
                             'domain': record.domain,
                             'database': record.database,
                             'username': record.username,
-                            'password': record.password
+                            'password': record.password,
+                            'session': record.session,
+                            'server_id': record.id
                         },
                         'id': None
                     }
                     remote_tags = self.call_api(data, "/api/compute/sync/tag")
-
+                    
                     if not remote_tags:
+                        record.server_tag_ids = [(6, 0, server_tag_ids)]
+                        continue
+                    
+                    if remote_tags.get('session', False):
+                        record.session = remote_tags['session']
+
+                    if not remote_tags["result"]:
                         record.server_tag_ids = [(6, 0, server_tag_ids)]
                         continue
                     tag_server_ids_for_delete = []
 
-                    for tag_server in remote_tags:
+                    for tag_server in remote_tags["result"]:
                         # Tìm hoặc tạo server.tag
                         server_tag = self.env['server.tag'].search([
                             ('server_id', '=', record.id),

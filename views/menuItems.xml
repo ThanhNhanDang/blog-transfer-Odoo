@@ -28,11 +28,10 @@
             action="action_server_configuration"
         />
 
-        <record id="action_blog_transfer_scheduler" model="ir.actions.server">
+        <record id="action_blog_transfer_scheduler" model="ir.actions.act_window">
             <field name="name">Blog Transfer Schedules</field>
-            <field name="model_id" ref="model_blog_transfer_scheduler" />
-            <field name="state">code</field>
-            <field name="code">action = model.action_show()</field>
+            <field name="res_model">blog.transfer.scheduler</field>
+            <field name="view_mode">tree,form</field>
         </record>
 
         <!-- Menu -->

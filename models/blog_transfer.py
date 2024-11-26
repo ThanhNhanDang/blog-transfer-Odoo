@@ -5,7 +5,6 @@ import logging
 import requests
 from odoo.exceptions import UserError
 from odoo import models, fields, api, _
-from odoo import models, fields, api, _  # Nhập các mô-đun cần thiết từ Odoo
 from odoo.exceptions import UserError  # Nhập ngoại lệ UserError để xử lý lỗi
 import requests  # Nhập thư viện requests để thực hiện các yêu cầu HTTP
 import logging  # Nhập thư viện logging để ghi lại thông tin và lỗi
@@ -22,9 +21,10 @@ class BlogTransfer(models.Model):
     name = fields.Char(string="Tên chiến dịch chuyển", required=True)
 
     selected_post_id = fields.Many2one(
-        'blog.post', string='Selected Blog Post', store=True)
+        'blog.post', string='Selected Blog Post', store=True, required=True)
 
-    server_mapping_id = fields.Many2one('server', string='Server Mapping')
+    server_mapping_id = fields.Many2one(
+        'server', string='Server Mapping', required=True)
 
     blog_tag_ids = fields.Many2many(
         'blog.tag',  related='selected_post_id.tag_ids', string='Tag bài viết được chọn')
@@ -43,6 +43,12 @@ class BlogTransfer(models.Model):
 
     start_time = fields.Datetime(string='Thời gian bắt đầu')
     end_time = fields.Datetime(string='Thời gian kết thúc')
+    
+    scheduled_date = fields.Datetime(
+        string='Đặt thời gian dự kiến chuyển',
+        required=True,
+        default=lambda self: fields.Datetime.now()
+    )
 
     blog_post_write_date = fields.Datetime(
         string='Blog Post Last Update On',  related='selected_post_id.write_date')
@@ -59,6 +65,12 @@ class BlogTransfer(models.Model):
 
     # Biến class để lưu instance của controller
     _blog_controller = None
+    
+    @api.constrains('scheduled_date')
+    def _check_scheduled_date(self):
+        for record in self:
+            if record.scheduled_date < fields.Datetime.now():
+                raise UserError(_('Thời gian dự kiến chuyển phải lớn hơn thời gian hiện tại!'))
 
     @classmethod
     def get_blog_controller(self):
@@ -71,19 +83,11 @@ class BlogTransfer(models.Model):
 
     def create(self, vals):
         new_record = super(BlogTransfer, self).create(vals)
-        scheduler = self.env['blog.transfer.scheduler'].search([], limit=1)
-        if not scheduler:
-            scheduler = self.env['blog.transfer.scheduler'].create({
-                'name': 'Scheduler',
-                'user_id': self.env.user.id,
-                'interval_number': 1,
-                'interval_type': 'minutes',
-                'numbercall': -1,
-                'state': 'draft',
-                'doall': False,
-                'active': True
-            })
-        scheduler.blog_transfer_ids = [(4, new_record.id)]
+
+        self.env['blog.transfer.scheduler'].create({
+            'name': new_record.name,
+            'blog_transfer_id': new_record.id
+        })
         return new_record
 
     @api.onchange('selected_post_id', 'server_mapping_id')
@@ -116,6 +120,8 @@ class BlogTransfer(models.Model):
                 'database': server.database,
                 'username': server.username,
                 'password': server.password,
+                'session':server.session,
+                'server_id':server.id,
                 'blog_transfer_id': self.id,
                 'db_name_local': self.env.cr.dbname
             }
@@ -151,8 +157,6 @@ class BlogTransfer(models.Model):
             self.write({'error_log': error_log})
 
     def action_start_transfer(self):
-        self.ensure_one()
-
         # Validation
         if not self.selected_post_id:
             raise UserError(_("Vui lòng chọn ít nhất một bài viết để chuyển"))
@@ -208,6 +212,13 @@ class BlogTransfer(models.Model):
                 "is_error": False if isSuccess else True,
                 'end_time': fields.Datetime.now(),
             }
+
+            if isSuccess:
+                scheduler = self.env['blog.transfer.scheduler'].search(
+                    [('blog_transfer_id', '=', self.id)], limit=1)
+                if scheduler:
+                    scheduler.unlink()
+
             self.write(data_update)
 
             # Log tổng kết
