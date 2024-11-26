@@ -1,6 +1,7 @@
 import xmlrpc.client
 import pytz
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import logging
 import requests
 from odoo.exceptions import UserError
@@ -82,6 +83,12 @@ class BlogTransfer(models.Model):
         return self._blog_controller
 
     def create(self, vals):
+        current_time = fields.Datetime.now()
+        if fields.Datetime.from_string(vals['scheduled_date']) < current_time:
+            vals['scheduled_date'] = fields.Datetime.to_datetime(
+                fields.Datetime.from_string(current_time) + relativedelta(minutes=1)
+            )
+        
         new_record = super(BlogTransfer, self).create(vals)
 
         self.env['blog.transfer.scheduler'].create({
