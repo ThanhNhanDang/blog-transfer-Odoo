@@ -16,6 +16,7 @@ class BlogTransferScheduler(models.Model):
         'blog.transfer',
         string='Chiến dịch chuyển',
     )
+   
 
     @api.model
     def _run_transfer_jobs(self):

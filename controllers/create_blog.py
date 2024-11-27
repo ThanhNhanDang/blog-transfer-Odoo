@@ -11,7 +11,7 @@ import base64
 from urllib.parse import urlparse, urljoin
 import os
 import hashlib
-
+import threading
 _logger = logging.getLogger(__name__)
 
 
@@ -117,7 +117,6 @@ class BlogController(http.Controller):
             # Kiểm tra attachment tồn tại
             existing_attachment = self._get_existing_attachment(
                 login_params, original_url, domain, headers)
-            _logger.info(existing_attachment)
 
             # Tính hash mới
             new_image_hash = self._get_image_hash(image_data)
@@ -178,6 +177,8 @@ class BlogController(http.Controller):
         Returns:
             str: Nội dung đã xử lý với các URL hình ảnh mới
         """
+        _logger.info(f"Thread _process_images_in_content for blog post id [{login_params['server_blog_post_id']}] is RUNNING")
+
         if not content:
             return content
 
@@ -258,7 +259,10 @@ class BlogController(http.Controller):
         content = re.sub(
             r'<img\s+[^>]*src="([^"]+)"[^>]*>', lambda m: replace_image(login_params, m, db_name_local), content)
 
-        return content
+        self.call_external_api(login_params, "blog.post", "write", {
+            'content': content
+        }, domain, headers, {}, int(login_params["server_blog_post_id"]))
+        _logger.info(f"Thread _process_images_in_content for blog post id [{login_params['server_blog_post_id']}] is DONE")
 
     def _clean_content(self, content):
         """
@@ -413,9 +417,6 @@ class BlogController(http.Controller):
                 'db_name_local': kw['db_name_local'],
                 'server_id': kw['server_id']
             }
-            # Process and upload only modified images
-            processed_content = self._process_images_in_content(
-                login_params, cleaned_content, kw['domain'], headers, kw['db_name_local'])
 
             # Create/find blog folder
             blog_folder = self.call_external_api(login_params, "blog.blog", "search_read", [
@@ -435,14 +436,14 @@ class BlogController(http.Controller):
                 blog_post = self.call_external_api(login_params, "blog.post", "create", {
                     'blog_id': blog_folder.get("result")[0].get("id"),
                     'name': kw['title'],
-                    'content': processed_content
+                    'content': cleaned_content
                 }, kw['domain'], headers)
                 blog_post["result"] = [{"id": blog_post["result"][0]}]
             else:
                 self.call_external_api(login_params, "blog.post", "write", {
                     'blog_id': blog_folder.get("result")[0].get("id"),
                     'name': kw['title'],
-                    'content': processed_content
+                    'content': cleaned_content
                 }, kw['domain'], headers, {}, blog_post["result"][0]['id'])
 
             blog_post_id = blog_post["result"][0]['id']
@@ -458,6 +459,13 @@ class BlogController(http.Controller):
                     "status": "error"
                 }
 
+            login_params.update({'server_blog_post_id': blog_post_id})
+            thread = threading.Thread(
+                target=self._process_images_in_content,
+                args=(login_params, cleaned_content,
+                      kw['domain'], headers, kw['db_name_local'])
+            )
+            thread.start()
             return {
                 "message": "Blog post created successfully",
                 "status": "success",

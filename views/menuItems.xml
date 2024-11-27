@@ -28,6 +28,8 @@
             action="action_server_configuration"
         />
 
+        <!-- Start Lịch chuyển blog -->
+
         <record id="action_blog_transfer_scheduler" model="ir.actions.act_window">
             <field name="name">Blog Transfer Schedules</field>
             <field name="res_model">blog.transfer.scheduler</field>
@@ -41,5 +43,6 @@
             action="action_blog_transfer_scheduler"
             sequence="20" />
 
+        <!-- End Lịch chuyển blog -->
     </data>
 </odoo>

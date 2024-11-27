@@ -10,8 +10,8 @@
     "depends": ["base", "web", "website_blog"],
     "data": [  # Do no change the order
         "security/ir.model.access.csv",
+        "data/cron_blog_transfer.xml",
         "views/blog_transfer_scheduler.xml",
-        "data/cron_check_blog_transfer.xml",
         "views/blog_transfer.xml",
         "views/serverView.xml",
         "views/menuItems.xml",
